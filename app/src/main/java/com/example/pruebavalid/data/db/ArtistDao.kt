@@ -13,7 +13,6 @@ interface ArtistDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     fun updateArtist(artist: Artist): Long
 
-    @Query("SELECT * FROM artist WHERE uid = $CURRENT_USER_ID)")
+    @Query("SELECT * FROM artist WHERE uid = $CURRENT_USER_ID")
     fun getArtist(): LiveData<Artist>
-
 }
