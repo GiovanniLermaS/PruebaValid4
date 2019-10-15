@@ -1,66 +1,90 @@
 package com.example.pruebavalid.ui.auth
 
-import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import android.os.Handler
+import android.view.View
+import android.widget.AbsListView
+import android.widget.SearchView
+import androidx.appcompat.app.AppCompatActivity
 import androidx.databinding.DataBindingUtil
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProviders
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.example.pruebavalid.R
+import com.example.pruebavalid.data.db.entities.Artist
+import com.example.pruebavalid.data.db.entities.ResponseTopArtists
 import com.example.pruebavalid.databinding.ActivityArtistBinding
 import com.example.pruebavalid.util.toast
-import androidx.recyclerview.widget.RecyclerView
-import android.view.LayoutInflater
-import android.view.View
-import android.view.ViewGroup
-import com.paginate.Paginate
-import com.paginate.recycler.LoadingListItemCreator
-import android.widget.TextView
-import androidx.recyclerview.widget.StaggeredGridLayoutManager
-import com.example.pruebavalid.data.db.entities.ResponseTopArtists
 import com.google.gson.Gson
 import kotlinx.android.synthetic.main.activity_artist.*
-import android.os.Handler
-import android.widget.SearchView
-import retrofit2.Retrofit
 
 
-class ArtistActivity : AppCompatActivity(), AuthListener, Paginate.Callbacks,
+class ArtistActivity : AppCompatActivity(), AuthListener,
     SearchView.OnQueryTextListener {
 
-    private var paginate: Paginate? = null
-
     private var adapter: ArtistsAdapter? = null
-
-    private var page = 0
-
-    private var loading = false
-
-    private val handler = Handler()
-
-    private val fakeCallback = Runnable {
-        page++
-        loading = false
-    }
 
     override fun onStarted() {
 
     }
 
+    private var artists = ArrayList<Artist>()
+
+    private var isScrolling = false
+
+    private var currentItems = 0
+
+    private var totalItems = 0
+
+    private var scrollOutItems = 0
+
+    private var topArtists: ResponseTopArtists? = null
+
     override fun onSuccess(artistResponse: LiveData<String>) {
         artistResponse.observe(this, Observer {
 
-            val topArtists = Gson().fromJson<ResponseTopArtists>(it, ResponseTopArtists::class.java)
+            topArtists = Gson().fromJson<ResponseTopArtists>(it, ResponseTopArtists::class.java)
+
+            for (i in 0..6)
+                artists.add(topArtists?.topartists?.artist!![i])
 
             adapter =
-                ArtistsAdapter(this, topArtists.topartists.artist, topArtists.topartists.artist)
+                ArtistsAdapter(this, artists, artists)
             rvArtist.adapter = adapter
 
-            paginate = Paginate.with(rvArtist, this)
-                .setLoadingTriggerThreshold(1)
-                .setLoadingListItemCreator(CustomLoadingListItemCreator())
-                .build()
+            rvArtist.addOnScrollListener(object : RecyclerView.OnScrollListener() {
+
+                override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
+                    super.onScrollStateChanged(recyclerView, newState)
+                    if (newState == AbsListView.OnScrollListener.SCROLL_STATE_TOUCH_SCROLL)
+                        isScrolling = true
+                }
+
+                override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
+                    super.onScrolled(recyclerView, dx, dy)
+                    val manager = (rvArtist.layoutManager) as LinearLayoutManager
+                    currentItems = manager.childCount
+                    totalItems = manager.itemCount
+                    scrollOutItems = manager.findFirstVisibleItemPosition()
+                    if (isScrolling && (currentItems + scrollOutItems == totalItems)) {
+                        isScrolling = false
+                        fetchData()
+                    }
+                }
+            })
         })
+    }
+
+    private fun fetchData() {
+        progress.visibility = View.VISIBLE
+        Handler().postDelayed({
+            for (i in 0..6)
+                artists.add(topArtists?.topartists?.artist!![i])
+            adapter?.notifyDataSetChanged()
+            progress.visibility = View.GONE
+        }, 2000)
     }
 
     override fun onFailure(message: String) {
@@ -87,40 +111,5 @@ class ArtistActivity : AppCompatActivity(), AuthListener, Paginate.Callbacks,
     override fun onQueryTextSubmit(query: String?): Boolean {
         adapter?.filter?.filter(query)
         return false
-    }
-
-    override fun onLoadMore() {
-        loading = true
-        handler.postDelayed(fakeCallback, 200)
-    }
-
-
-    override fun isLoading() = loading
-
-    override fun hasLoadedAllItems() = page == 1
-
-    inner class CustomLoadingListItemCreator : LoadingListItemCreator {
-        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
-            val inflater = LayoutInflater.from(parent.context)
-            val view = inflater.inflate(R.layout.custom_loading_list_item, parent, false)
-            return VH(view)
-        }
-
-        override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
-            val vh = holder as VH
-            vh.tvLoading.text = String.format(
-                "Total items loaded: %d.\nLoading more...",
-                adapter?.itemCount
-            )
-            if (rvArtist.layoutManager is StaggeredGridLayoutManager) {
-                val params =
-                    vh.itemView.layoutParams as StaggeredGridLayoutManager.LayoutParams
-                params.isFullSpan = true
-            }
-        }
-    }
-
-    internal class VH(itemView: View) : RecyclerView.ViewHolder(itemView) {
-        var tvLoading: TextView = itemView.findViewById(R.id.tv_loading_text)
     }
 }

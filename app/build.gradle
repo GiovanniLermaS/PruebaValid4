@@ -73,11 +73,6 @@ dependencies {
 
     implementation "androidx.preference:preference-ktx:1.1.0"
 
-    //Pagination
-    implementation 'com.github.markomilos:paginate:0.5.1'
-
-    implementation 'com.github.castorflex.smoothprogressbar:library-circular:1.1.0'
-
     // CardView
     implementation 'androidx.cardview:cardview:1.0.0'
 
